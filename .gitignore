@@ -1,3 +1,24 @@
-.DS_Store
+# Fichiers exclus de git pour tout le dépôt (server/, client/, e2e/ et futurs dossiers).
+
+# Documents de travail personnels, volontairement hors du dépôt : le README final doit se suffire à lui-même.
+fastandshare-mvp-plan.md
+docs/decisions.md
+
+# Dépendances et artefacts générés : toujours reconstructibles (npm ci, build, tests).
+node_modules/
+dist/
+coverage/
+
+# Secrets locaux : seul le modèle .env.example (sans valeurs réelles) est versionné.
 .env
-fastandshare_mvp_plan.md
+.env.*
+!.env.example
+
+# Fichiers système macOS.
+.DS_Store
+
+# Rapports et caches Playwright (T5.1).
+playwright-report/
+test-results/
+blob-report/
+playwright/.cache/

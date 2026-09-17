@@ -1,0 +1,15 @@
+# Règles d'édition partagées par tous les éditeurs, pour éviter les diffs parasites (indentation, fins de ligne).
+root = true
+
+# Style commun : celui déjà utilisé par les gabarits Vite et TypeScript du dépôt.
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 2
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# En Markdown, deux espaces en fin de ligne forcent un retour à la ligne : on ne les supprime pas.
+[*.md]
+trim_trailing_whitespace = false
