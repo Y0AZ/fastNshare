@@ -1,0 +1,13 @@
+// Configuration de BUILD (npm run build) : compile uniquement src/ vers dist/, sans les tests ni les types Jest.
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // rootDir fixé sur src : dist/ reproduit src/ à l'identique (dist/server.js, pas dist/src/server.js).
+    "rootDir": "src",
+    "outDir": "dist",
+    "noEmit": false,
+    // Le code livré ne doit pas pouvoir utiliser les globales de Jest par accident.
+    "types": ["node"]
+  },
+  "include": ["src"]
+}

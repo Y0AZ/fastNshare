@@ -1,16 +1,23 @@
+// Configuration de VÉRIFICATION (npm run typecheck, éditeur) : couvre le code ET les tests, sans rien produire.
+// Le build passe par tsconfig.build.json, qui étend celui-ci.
 {
   "compilerOptions": {
     "target": "es2023",
     "lib": ["ES2023"],
+    // NodeNext : TypeScript applique les règles ESM de Node, d'où l'extension .js obligatoire dans les imports relatifs.
     "module": "nodenext",
     "moduleResolution": "nodenext",
-    "types": ["node"],
+    // Types globaux chargés explicitement : ceux de Node, et ceux de Jest (describe, it, expect) pour les tests.
+    "types": ["node", "jest"],
 
-    "rootDir": "src",
-    "outDir": "dist",
+    // Vérification seule : aucun fichier écrit, et rien de produit si une erreur est trouvée.
+    "noEmit": true,
+    "noEmitOnError": true,
 
     "strict": true,
+    // Les imports de types doivent être marqués `import type` : ce qui est effacé à la compilation se voit dans le code.
     "verbatimModuleSyntax": true,
+    // Chaque fichier doit être compilable seul : c'est ainsi que travaillent tsx et @swc/jest.
     "isolatedModules": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
@@ -20,5 +27,5 @@
     "noFallthroughCasesInSwitch": true,
     "noImplicitReturns": true
   },
-  "include": ["src"]
+  "include": ["src", "tests"]
 }
