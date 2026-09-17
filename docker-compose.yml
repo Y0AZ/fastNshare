@@ -1,0 +1,65 @@
+# Dépendances locales de développement (MongoDB + stockage S3) : `docker compose up -d` à la racine.
+# Aucun service applicatif ici : le serveur et le client tournent avec npm, Render et Vercel construisent eux-mêmes.
+#
+# ⚠️ Tous les identifiants de ce fichier sont des valeurs de DÉVELOPPEMENT UNIQUEMENT, connues de tous.
+# Ils ne doivent jamais servir ailleurs (Atlas et le S3 de production ont leurs propres secrets, hors du dépôt).
+
+# Nom de projet fixe : les volumes s'appellent fast-share_mongo-data quel que soit le nom du dossier cloné.
+name: fast-share
+
+services:
+  mongo:
+    # Version exacte épinglée (pas `latest`) : tout le monde, CI comprise, teste contre la même base.
+    image: mongo:9.0.8
+    environment:
+      # Crée l'utilisateur root au PREMIER démarrage seulement (volume vide) ; le changer ensuite n'a aucun effet.
+      MONGO_INITDB_ROOT_USERNAME: fastshare
+      MONGO_INITDB_ROOT_PASSWORD: fastshare-dev-password
+    ports:
+      # 27018 côté hôte : un mongod local occupe déjà 27017 sur la machine de dev (voir docs/decisions.md).
+      # Liaison sur 127.0.0.1 : la base n'est pas joignable depuis le réseau local avec ces identifiants publics.
+      - "127.0.0.1:27018:27017"
+    volumes:
+      # Volume nommé : les données survivent à `docker compose down` (seul `down -v` les efface).
+      - mongo-data:/data/db
+    healthcheck:
+      # « healthy » seulement quand Mongo répond réellement à une commande, pas dès que le processus existe.
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  s3:
+    # SeaweedFS en mode `mini` : un seul processus fournit l'API S3 et l'interface d'admin (choix consigné en T0.2).
+    image: chrislusf/seaweedfs:4.54
+    command:
+      - mini
+      # /data est aussi l'emplacement des métadonnées du filer dans l'image officielle : un seul volume suffit.
+      - -dir=/data
+      # Bucket créé au démarrage s'il n'existe pas encore (idempotent à chaque redémarrage).
+      - -bucket=fastshare
+      # Sans mot de passe, l'interface d'admin n'écoute que dans le conteneur, donc invisible depuis l'hôte.
+      - -admin.password=fastshare-dev-admin
+      # Désactive l'envoi de statistiques anonymes vers seaweedfs.com, actif par défaut.
+      - -master.telemetry=false
+    environment:
+      # SeaweedFS crée une identité S3 admin à partir de ces deux variables : ce sont les clés que le serveur utilisera.
+      AWS_ACCESS_KEY_ID: fastshare-dev-access-key
+      AWS_SECRET_ACCESS_KEY: fastshare-dev-secret-key
+    ports:
+      - "127.0.0.1:8333:8333"   # API S3 (S3_ENDPOINT=http://localhost:8333)
+      - "127.0.0.1:12535:12535" # Interface d'admin (utilisateur « admin »)
+    volumes:
+      - s3-data:/data
+    healthcheck:
+      # /healthz répond 200 quand la passerelle S3 est prête ; curl est fourni par l'image.
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:8333/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+volumes:
+  mongo-data:
+  s3-data:
