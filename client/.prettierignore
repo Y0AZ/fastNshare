@@ -1,0 +1,3 @@
+# Fichiers que Prettier ne reformate pas (il ignore déjà ce que liste .gitignore, dont node_modules et dist).
+# Généré et maintenu par npm : le reformater produirait des diffs inutiles.
+package-lock.json
