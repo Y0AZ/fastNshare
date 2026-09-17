@@ -1,0 +1,49 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "description": "fast and share project",
+  "license": "ISC",
+  "author": "yoaz",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "tsx watch src/main.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc",
+    "start": "node dist/main.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1174.0",
+    "@aws-sdk/lib-storage": "^3.1174.0",
+    "archiver": "^8.0.0",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.10",
+    "express": "^5.3.0",
+    "express-rate-limit": "^8.7.5",
+    "mongoose": "^9.12.3",
+    "multer": "^2.5.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@swc/core": "^1.16.22",
+    "@swc/jest": "^0.2.39",
+    "@testcontainers/mongodb": "^12.2.2",
+    "@types/archiver": "^8.0.0",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jest": "^30.0.0",
+    "@types/multer": "^2.3.0",
+    "@types/node": "^24.19.2",
+    "@types/supertest": "^7.2.1",
+    "eslint": "^10.15.0",
+    "globals": "^17.14.0",
+    "jest": "^30.5.2",
+    "prettier": "^3.10.1",
+    "supertest": "^7.3.2",
+    "testcontainers": "^12.2.2",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.73.0"
+  }
+}
