@@ -1,0 +1,68 @@
+# Intégration continue : vérifie le serveur et le client (lint, format, types, tests, build) à chaque PR et sur main.
+name: CI
+
+on:
+  # Push limité à main : sur une branche ouverte en PR, l'événement pull_request suffit (sinon chaque push lancerait deux fois la CI).
+  push:
+    branches: [main]
+  # Exécuté sur le résultat de la fusion de la branche avec main : on teste ce qui arrivera réellement dans main.
+  pull_request:
+
+# Moindre privilège : le workflow ne fait que lire le code, il ne peut ni pousser ni commenter.
+permissions:
+  contents: read
+
+# Un nouveau push sur la même branche annule l'exécution précédente devenue inutile.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Les deux jobs sont indépendants : GitHub les exécute en parallèle, chacun sur sa propre machine.
+  server:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          # Même version de Node qu'en local : une seule source de vérité, le .nvmrc à la racine.
+          node-version-file: .nvmrc
+          # Met en cache le dossier de téléchargement de npm (~/.npm), pas node_modules ; la clé dépend du lockfile,
+          # donc le cache est invalidé dès qu'une dépendance change.
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      # npm ci installe exactement le lockfile (et échoue s'il ne correspond pas au package.json) : build reproductible.
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  client:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
