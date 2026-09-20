@@ -7,6 +7,7 @@ dotenv.config({ quiet: true });
 
 export type Env = {
   port: number;
+  mongodbUri: string;
 };
 
 type EnvSource = Record<string, string | undefined>;
@@ -28,9 +29,18 @@ function parsePort(raw: string): number {
   return port;
 }
 
+// Vérifie seulement le schéma de l'URI : le message d'erreur ne doit jamais recopier l'URI, qui contient le mot de passe.
+function parseMongoUri(raw: string): string {
+  if (!/^mongodb(\+srv)?:\/\//.test(raw)) {
+    throw new Error('MONGODB_URI doit commencer par "mongodb://" ou "mongodb+srv://"');
+  }
+  return raw;
+}
+
 // La source est injectable pour que les tests vérifient la validation sans modifier le vrai process.env.
 export function loadEnv(source: EnvSource = process.env): Env {
   return {
     port: parsePort(required(source, "PORT")),
+    mongodbUri: parseMongoUri(required(source, "MONGODB_URI")),
   };
 }
