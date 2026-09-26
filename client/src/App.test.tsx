@@ -7,7 +7,7 @@ describe("App", () => {
   // Recherche par rôle accessible plutôt que par classe CSS : on teste ce que voit l'utilisateur.
   it("affiche le titre de l'application", () => {
     render(<App />);
-    expect(screen.getByRole("heading", { level: 1, name: "fast&Share" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Fast&Share" })).toBeInTheDocument();
   });
 
   it("affiche un bouton shadcn", () => {

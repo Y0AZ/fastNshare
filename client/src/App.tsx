@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 function App() {
   return (
     <main className="flex min-h-svh flex-col items-center justify-center gap-6 bg-background p-4 text-foreground">
-      <h1 className="text-4xl font-bold tracking-tight">fast&amp;Share</h1>
+      <h1 className="text-4xl font-bold tracking-tight">Fast&amp;Share</h1>
       <p className="text-muted-foreground">Transfert de fichiers par code, sans compte.</p>
       <Button>Commencer</Button>
     </main>

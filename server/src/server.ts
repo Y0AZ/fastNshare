@@ -1,9 +1,10 @@
-// Point d'entrée du processus : valide la configuration, connecte MongoDB, ouvre le port HTTP et gère l'arrêt.
+// Point d'entrée du processus : valide la configuration, connecte MongoDB et S3, ouvre le port HTTP, gère l'arrêt.
 // Jamais importé par les tests.
 import mongoose from "mongoose";
 import { createApp } from "./app.js";
 import { loadEnv } from "./config/env.js";
 import { Transfer } from "./models/transfer.model.js";
+import { createStorage } from "./lib/storage.js";
 
 // Message court et lisible plutôt qu'une pile d'appels : au démarrage, c'est un problème d'environnement, pas un bug.
 function exitOnStartupError(context: string, error: unknown): never {
@@ -30,6 +31,15 @@ try {
   exitOnStartupError("MongoDB", error);
 }
 console.log("MongoDB connecté, index de la collection transfers en place");
+
+// Même logique pour S3 : une clé invalide ou un moteur arrêté doit bloquer le démarrage, pas le premier envoi.
+const storage = createStorage(env.s3);
+try {
+  await storage.ensureBucket();
+} catch (error) {
+  exitOnStartupError("S3", error);
+}
+console.log(`Stockage S3 prêt (bucket ${env.s3.bucket})`);
 
 const port = env.port;
 const app = createApp();
