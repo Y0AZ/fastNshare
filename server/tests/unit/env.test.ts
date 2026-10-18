@@ -1,5 +1,5 @@
 // Teste la validation de la configuration avec de faux environnements : le vrai process.env n'est jamais modifié.
-import { loadEnv, required } from "../../src/config/env.js";
+import { loadEnv, required } from "../../src/configs/env.js";
 
 const MONGODB_URI = "mongodb://user:secret@localhost:27018/fastshare?authSource=admin";
 

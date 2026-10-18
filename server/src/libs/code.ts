@@ -1,6 +1,6 @@
 // Génération et normalisation des codes de transfert : le code est la seule barrière d'accès aux fichiers.
 import { randomInt } from "node:crypto";
-import { CODE_ALPHABET, CODE_LENGTH } from "../config/limits.js";
+import { CODE_ALPHABET, CODE_LENGTH } from "../configs/limits.js";
 
 // crypto.randomInt puise dans le générateur cryptographique du système : les codes sont imprévisibles.
 // Math.random() ne l'est pas (son état interne peut être reconstitué à partir de quelques sorties).
@@ -16,6 +16,13 @@ export function generateCode(): string {
 // Saisie utilisateur → forme stockée en base (le modèle met aussi le code en majuscules à l'écriture).
 export function normalizeCode(input: string): string {
   return input.trim().toUpperCase();
+}
+
+const CODE_PATTERN = new RegExp(`^[${CODE_ALPHABET}]{${CODE_LENGTH}}$`);
+
+// À appliquer après normalizeCode : un code mal formé ne peut pas exister, inutile d'interroger la base.
+export function isValidCode(code: string): boolean {
+  return CODE_PATTERN.test(code);
 }
 
 // Erreur d'index unique (E11000) portant sur le champ `code`. On ne retente que dans ce cas précis :

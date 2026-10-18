@@ -1,5 +1,5 @@
 // Teste la construction des clés de stockage (fonction pure) ; les appels S3 réels sont vérifiés contre le compose.
-import { buildStorageKey } from "../../src/lib/storage.js";
+import { buildStorageKey } from "../../src/libs/storage.js";
 
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
 

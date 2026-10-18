@@ -1,6 +1,6 @@
 // Teste le générateur de codes : format, alphabet, unicité statistique et retry sur doublon simulé.
-import { CODE_ALPHABET, CODE_LENGTH } from "../../src/config/limits.js";
-import { generateCode, generateUniqueCode, normalizeCode } from "../../src/lib/code.js";
+import { CODE_ALPHABET, CODE_LENGTH } from "../../src/configs/limits.js";
+import { generateCode, generateUniqueCode, isValidCode, normalizeCode } from "../../src/libs/code.js";
 
 // Erreur de même forme que celle renvoyée par le driver MongoDB sur un doublon d'index unique.
 function duplicateKeyError(field: string) {
@@ -44,6 +44,17 @@ describe("generateCode()", () => {
 describe("normalizeCode()", () => {
   it("retire les espaces autour et met en majuscules", () => {
     expect(normalizeCode("  abcd2345\n")).toBe("ABCD2345");
+  });
+});
+
+describe("isValidCode()", () => {
+  it("accepte un code généré", () => {
+    expect(isValidCode(generateCode())).toBe(true);
+  });
+
+  // Trop court, trop long, caractère exclu de l'alphabet (0, O, 1, I, L), minuscules non normalisées.
+  it.each(["ABCD234", "ABCD23456", "ABCD2340", "ABCDO234", "abcd2345", ""])("refuse %j", (code) => {
+    expect(isValidCode(code)).toBe(false);
   });
 });
 

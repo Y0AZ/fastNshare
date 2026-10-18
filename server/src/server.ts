@@ -2,9 +2,10 @@
 // Jamais importé par les tests.
 import mongoose from "mongoose";
 import { createApp } from "./app.js";
-import { loadEnv } from "./config/env.js";
+import { loadEnv } from "./configs/env.js";
+import { REQUEST_TIMEOUT_MS } from "./configs/limits.js";
 import { Transfer } from "./models/transfer.model.js";
-import { createStorage } from "./lib/storage.js";
+import { createStorage } from "./libs/storage.js";
 
 // Message court et lisible plutôt qu'une pile d'appels : au démarrage, c'est un problème d'environnement, pas un bug.
 function exitOnStartupError(context: string, error: unknown): never {
@@ -42,7 +43,7 @@ try {
 console.log(`Stockage S3 prêt (bucket ${env.s3.bucket})`);
 
 const port = env.port;
-const app = createApp();
+const app = createApp({ storage });
 
 // Express 5 transmet au callback les erreurs d'écoute (ex. port déjà utilisé) au lieu de les ignorer.
 const server = app.listen(port, (error) => {
@@ -52,6 +53,8 @@ const server = app.listen(port, (error) => {
   }
   console.log(`Serveur prêt sur http://localhost:${port}`);
 });
+// Compte depuis le début de la requête jusqu'à la fin de son corps : c'est lui qui borne la durée d'un upload.
+server.requestTimeout = REQUEST_TIMEOUT_MS;
 
 // Arrêt propre : Render envoie SIGTERM avant de remplacer une instance, Ctrl+C envoie SIGINT, tsx watch aussi.
 let shuttingDown = false;

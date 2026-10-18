@@ -116,8 +116,10 @@ export function createStorage(config: StorageConfig): Storage {
         client,
         params: { Bucket: bucket, Key: key, Body: stream, ContentType: contentType },
       });
-      // Permet à l'appelant (requête HTTP abandonnée par le client, T2.2) d'interrompre l'envoi en cours.
-      const onAbort = () => void upload.abort();
+      // Annulation par destruction du flux source, PAS par upload.abort() : abort() rejette done() aussitôt alors
+      // qu'un PUT déjà parti peut encore aboutir, d'où un objet créé après l'échec annoncé (constaté sur SeaweedFS).
+      // Flux détruit → Upload échoue normalement : done() attend les envois en vol, annule le multipart, puis dit vrai.
+      const onAbort = () => stream.destroy(new Error("envoi annulé"));
       signal?.addEventListener("abort", onAbort, { once: true });
       try {
         await upload.done();

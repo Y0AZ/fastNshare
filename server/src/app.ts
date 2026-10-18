@@ -1,9 +1,18 @@
 // Construit l'application Express sans ouvrir de port : importable telle quelle par les tests (Supertest).
 import express, { type Express } from "express";
+import type { Storage } from "./libs/storage.js";
+import { errorHandler, notFoundHandler } from "./middlewares/error-handler.js";
+import { createTransfersRouter } from "./routes/transfers.routes.js";
+
+// Les dépendances sont passées en paramètre plutôt qu'importées : server.ts fournit le vrai stockage S3,
+// les tests un stockage en mémoire, sans que l'app sache lequel elle utilise.
+export type AppDependencies = {
+  storage: Storage;
+};
 
 // Une fabrique plutôt qu'une instance partagée : chaque test obtient une app neuve, et la configuration
 // (CORS, limites…) pourra lui être passée en paramètre sans dépendre de process.env.
-export function createApp(): Express {
+export function createApp({ storage }: AppDependencies): Express {
   const app = express();
 
   // Masque l'en-tête « X-Powered-By: Express » : inutile de dire au monde quel framework on utilise.
@@ -14,6 +23,12 @@ export function createApp(): Express {
   app.get("/health", (_req, res) => {
     res.json({ status: "ok" });
   });
+
+  app.use("/api/transfers", createTransfersRouter(storage));
+
+  // Toujours en dernier, dans cet ordre : route inconnue → 404, puis conversion de toute erreur en JSON.
+  app.use(notFoundHandler);
+  app.use(errorHandler);
 
   return app;
 }

@@ -1,6 +1,6 @@
 // Lit et valide les variables d'environnement : le serveur refuse de démarrer si la configuration est incomplète.
 import dotenv from "dotenv";
-import type { StorageConfig } from "../lib/storage.js";
+import type { StorageConfig } from "../libs/storage.js";
 
 // Charge server/.env s'il existe. En production (Render), les variables viennent de l'hébergeur et ce fichier
 // est absent : dotenv ne fait alors rien. `quiet` évite le message publicitaire que dotenv affiche par défaut.
