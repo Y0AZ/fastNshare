@@ -2,18 +2,30 @@
 import express, { type Express } from "express";
 import type { Storage } from "./libs/storage.js";
 import { errorHandler, notFoundHandler } from "./middlewares/error-handler.js";
+import { createMaintenanceRouter } from "./routes/maintenance.routes.js";
 import { createTransfersRouter } from "./routes/transfers.routes.js";
 
 // Les dépendances sont passées en paramètre plutôt qu'importées : server.ts fournit le vrai stockage S3,
 // les tests un stockage en mémoire, sans que l'app sache lequel elle utilise.
 export type AppDependencies = {
   storage: Storage;
+  // Nombre de proxys de confiance (TRUST_PROXY) ; 0 par défaut : l'app est exposée directement.
+  trustProxy?: number;
+  // Jeton de maintenance (MAINTENANCE_TOKEN) ; absent → routes de maintenance non montées.
+  maintenanceToken?: string;
 };
 
 // Une fabrique plutôt qu'une instance partagée : chaque test obtient une app neuve, et la configuration
 // (CORS, limites…) pourra lui être passée en paramètre sans dépendre de process.env.
-export function createApp({ storage }: AppDependencies): Express {
+export function createApp({ storage, trustProxy = 0, maintenanceToken }: AppDependencies): Express {
   const app = express();
+
+  // trust proxy : derrière Render, la connexion vient du proxy de Render, pas du client. Sans ce réglage,
+  // req.ip serait la même pour tout le monde et le rate limit bloquerait tous les utilisateurs à la fois.
+  // Avec N, Express lit la vraie IP dans X-Forwarded-For en ne croyant que les N derniers relais.
+  // false plutôt que 0 : express-rate-limit signale alors dans les logs un X-Forwarded-For reçu sans proxy
+  // déclaré (indice d'un TRUST_PROXY oublié), mais seulement si c'est la toute première requête limitée.
+  app.set("trust proxy", trustProxy > 0 ? trustProxy : false);
 
   // Masque l'en-tête « X-Powered-By: Express » : inutile de dire au monde quel framework on utilise.
   app.disable("x-powered-by");
@@ -25,6 +37,12 @@ export function createApp({ storage }: AppDependencies): Express {
   });
 
   app.use("/api/transfers", createTransfersRouter(storage));
+
+  // Montée seulement si un jeton est configuré : sans jeton, la route n'existe pas (404) au lieu d'exister
+  // sans protection, ou protégée par un jeton vide qu'il suffirait d'envoyer.
+  if (maintenanceToken) {
+    app.use("/api/maintenance", createMaintenanceRouter(storage, maintenanceToken));
+  }
 
   // Toujours en dernier, dans cet ordre : route inconnue → 404, puis conversion de toute erreur en JSON.
   app.use(notFoundHandler);

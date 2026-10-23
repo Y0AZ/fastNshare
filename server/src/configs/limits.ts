@@ -1,5 +1,5 @@
 // Règles métier centralisées (section 5.4 du plan) : une seule source de vérité, appliquée côté serveur.
-// Chaque tâche ajoute ici les limites qu'elle met en œuvre (rate limit en T2.4…).
+// Chaque tâche ajoute ici les limites qu'elle met en œuvre (dernières en T2.5).
 
 // 8 caractères : assez court pour être dicté ou recopié, assez long pour rendre la devinette irréaliste
 // (31^8 ≈ 852 milliards de combinaisons, à comparer aux 20 essais / 15 min autorisés par IP en T2.4).
@@ -27,3 +27,14 @@ export const MAX_DOWNLOADS = 1;
 export function formatMegabytes(bytes: number): string {
   return `${Math.round(bytes / MEGABYTE)} Mo`;
 }
+
+// Rate limit du téléchargement, par IP : 20 essais / 15 min rendent l'énumération des 31^8 codes irréaliste,
+// tout en laissant de la marge à un destinataire qui se trompe de code ou relance un téléchargement coupé.
+export const DOWNLOAD_RATE_LIMIT = 20;
+export const DOWNLOAD_RATE_WINDOW_MS = 15 * 60 * 1000;
+
+// Le nettoyage ne supprime que les transferts expirés depuis plus d'une heure : un téléchargement commencé juste
+// avant l'expiration (jusqu'à ~35 min pour 500 Mo à 2 Mbit/s) ne doit pas perdre ses fichiers en plein envoi.
+export const CLEANUP_GRACE_MS = 60 * 60 * 1000;
+// Transferts traités par lot : mémoire bornée, et au plus 20 × 100 = 2000 clés S3 par lot (2 requêtes DeleteObjects).
+export const CLEANUP_BATCH_SIZE = 100;

@@ -43,7 +43,7 @@ try {
 console.log(`Stockage S3 prêt (bucket ${env.s3.bucket})`);
 
 const port = env.port;
-const app = createApp({ storage });
+const app = createApp({ storage, trustProxy: env.trustProxy, maintenanceToken: env.maintenanceToken });
 
 // Express 5 transmet au callback les erreurs d'écoute (ex. port déjà utilisé) au lieu de les ignorer.
 const server = app.listen(port, (error) => {
@@ -52,6 +52,10 @@ const server = app.listen(port, (error) => {
     process.exit(1);
   }
   console.log(`Serveur prêt sur http://localhost:${port}`);
+  // Dit explicitement si la route de nettoyage existe : sinon un 404 en production serait déroutant.
+  console.log(
+    `Route de maintenance ${env.maintenanceToken ? "activée" : "désactivée (MAINTENANCE_TOKEN absent)"}`,
+  );
 });
 // Compte depuis le début de la requête jusqu'à la fin de son corps : c'est lui qui borne la durée d'un upload.
 server.requestTimeout = REQUEST_TIMEOUT_MS;

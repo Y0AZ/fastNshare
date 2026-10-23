@@ -10,6 +10,9 @@ export type Env = {
   port: number;
   mongodbUri: string;
   s3: StorageConfig;
+  trustProxy: number;
+  // Absent → la route de maintenance n'est pas montée du tout.
+  maintenanceToken?: string;
 };
 
 type EnvSource = Record<string, string | undefined>;
@@ -63,6 +66,30 @@ function parseUrl(name: string, raw: string | undefined): string | undefined {
   return raw;
 }
 
+// Nombre de proxys de confiance devant le serveur (1 derrière Render), et non « true » : avec true, Express
+// croirait l'IP la plus à gauche de X-Forwarded-For, que n'importe quel client peut écrire lui-même pour
+// changer d'identité à chaque requête et contourner le rate limit. Absent → 0 : aucun proxy, IP de la connexion.
+function parseTrustProxy(raw: string | undefined): number {
+  if (raw === undefined) return 0;
+  const hops = Number(raw);
+  if (!/^\d+$/.test(raw) || !Number.isSafeInteger(hops)) {
+    throw new Error(`TRUST_PROXY doit être un nombre de proxys, entier positif ou nul (reçu : "${raw}")`);
+  }
+  return hops;
+}
+
+// Jeton facultatif, mais s'il est défini il doit être long : il protège une route qui supprime des données.
+// 32 caractères minimum, soit l'ordre de grandeur de `openssl rand -hex 32` (64 caractères aléatoires).
+const MIN_MAINTENANCE_TOKEN_LENGTH = 32;
+function parseMaintenanceToken(raw: string | undefined): string | undefined {
+  if (raw !== undefined && raw.length < MIN_MAINTENANCE_TOKEN_LENGTH) {
+    throw new Error(
+      `MAINTENANCE_TOKEN doit faire au moins ${MIN_MAINTENANCE_TOKEN_LENGTH} caractères (générer : openssl rand -hex 32)`,
+    );
+  }
+  return raw;
+}
+
 // La source est injectable pour que les tests vérifient la validation sans modifier le vrai process.env.
 export function loadEnv(source: EnvSource = process.env): Env {
   return {
@@ -77,5 +104,7 @@ export function loadEnv(source: EnvSource = process.env): Env {
       secretAccessKey: required(source, "S3_SECRET_ACCESS_KEY"),
       forcePathStyle: parseBoolean("S3_FORCE_PATH_STYLE", optional(source, "S3_FORCE_PATH_STYLE"), false),
     },
+    trustProxy: parseTrustProxy(optional(source, "TRUST_PROXY")),
+    maintenanceToken: parseMaintenanceToken(optional(source, "MAINTENANCE_TOKEN")),
   };
 }

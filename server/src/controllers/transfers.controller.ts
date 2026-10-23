@@ -88,17 +88,18 @@ export function createTransfersController(storage: Storage) {
       }
     };
 
-    // Vérifie que tous les objets existent tant qu'une réponse JSON est encore possible. Sinon le destinataire
-    // recevrait un ZIP coupé au milieu au lieu d'un message clair. Cas réel : le document « fantôme » créé
-    // quand Mongo tombe pendant un upload compensé (voir T2.2), dont les objets ont été supprimés.
-    let present: boolean[];
+    // Lit la taille réelle de chaque objet tant qu'une réponse JSON est encore possible. Elle sert deux fois :
+    // un objet absent donne un 410 clair au lieu d'un ZIP coupé au milieu (cas réel : le document « fantôme »
+    // de T2.2, dont les objets ont été supprimés) ; et la taille du bucket, plutôt que celle notée en base,
+    // garantit un Content-Length exact.
+    let sizes: (number | undefined)[];
     try {
-      present = await Promise.all(transfer.files.map((file) => storage.exists(file.storageKey)));
+      sizes = await Promise.all(transfer.files.map((file) => storage.getSize(file.storageKey)));
     } catch (error) {
       await release();
       throw error;
     }
-    const missing = transfer.files.filter((_file, index) => !present[index]);
+    const missing = transfer.files.filter((_file, index) => sizes[index] === undefined);
     if (missing.length > 0) {
       // Pas de libération : les fichiers sont perdus, réessayer ne servirait à rien.
       console.error(
@@ -117,15 +118,19 @@ export function createTransfersController(storage: Storage) {
     });
 
     const zip = createZipStream(
-      transfer.files.map((file) => ({
+      transfer.files.map((file, index) => ({
         name: file.originalName,
+        sizeBytes: sizes[index] ?? 0,
         open: () => storage.getStream(file.storageKey),
       })),
     );
+    // Taille annoncée : le navigateur peut afficher une progression en pourcentage et détecter une coupure.
+    if (zip.sizeBytes !== undefined) res.set("Content-Length", String(zip.sizeBytes));
+
     try {
       // pipeline relie l'archive à la réponse et détruit l'une si l'autre échoue : client parti → archive (et
       // flux S3 en cours) détruits ; erreur de l'archive → réponse détruite, donc connexion coupée.
-      await pipeline(zip, res);
+      await pipeline(zip.stream, res);
     } catch (error) {
       // En-têtes déjà partis : aucun JSON possible, la coupure de connexion est le seul signal pour le client.
       await release();

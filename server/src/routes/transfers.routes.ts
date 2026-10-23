@@ -3,6 +3,7 @@ import { Router } from "express";
 import { createTransfersController } from "../controllers/transfers.controller.js";
 import type { Storage } from "../libs/storage.js";
 import { HttpError } from "../middlewares/http-error.js";
+import { createDownloadRateLimit } from "../middlewares/rate-limit.js";
 import { createUploadMiddleware } from "../middlewares/upload.js";
 
 export function createTransfersRouter(storage: Storage): Router {
@@ -18,7 +19,9 @@ export function createTransfersRouter(storage: Storage): Router {
     res.set("Allow", "GET");
     throw new HttpError(405, "Méthode non autorisée : utilisez GET.");
   });
-  router.get("/:code/download", controller.download);
+  // Rate limit placé AVANT le contrôleur : une requête refusée ne touche ni Mongo ni S3, et ne peut donc
+  // ni réserver un téléchargement ni révéler si un code existe.
+  router.get("/:code/download", createDownloadRateLimit(), controller.download);
 
   return router;
 }

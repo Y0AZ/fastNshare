@@ -69,6 +69,8 @@ describe("GET /api/transfers/:code/download", () => {
     expect(response.headers["content-disposition"]).toBe(`attachment; filename="fastshare-${CODE}.zip"`);
     expect(response.headers["cache-control"]).toBe("no-store");
     const body = response.body as Buffer;
+    // Taille annoncée = taille reçue : le navigateur peut afficher une progression exacte.
+    expect(Number(response.headers["content-length"])).toBe(body.length);
     expect(body.subarray(0, 2).toString()).toBe("PK");
     expect(body.includes("a.txt") && body.includes("b.txt")).toBe(true);
     expect(released()).toBe(false);
@@ -138,7 +140,7 @@ describe("GET /api/transfers/:code/download", () => {
   });
 
   it("libère la réservation si le stockage est injoignable avant l'envoi (500)", async () => {
-    storage.exists = async () => {
+    storage.getSize = async () => {
       throw new Error("S3 injoignable");
     };
 
@@ -159,7 +161,8 @@ describe("GET /api/transfers/:code/download", () => {
   });
 
   it("libère la réservation si le client se déconnecte en plein téléchargement", async () => {
-    // Fichier sans fin : le téléchargement est forcément en cours quand le client coupe.
+    // Fichier annoncé très gros et servi sans fin : le téléchargement est forcément en cours quand le client coupe.
+    storage.getSize = async () => 1024 * 1024 * 1024;
     storage.getStream = async () =>
       new Readable({
         read() {

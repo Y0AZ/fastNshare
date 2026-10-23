@@ -39,8 +39,8 @@ export function createMemoryStorage({ failPut = false, holdPut }: MemoryStorageO
       return Readable.from(object);
     },
 
-    async exists(key) {
-      return objects.has(key);
+    async getSize(key) {
+      return objects.get(key)?.length;
     },
 
     async deleteObjects(keys): Promise<DeleteResult> {

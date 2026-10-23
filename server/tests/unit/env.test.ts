@@ -40,6 +40,8 @@ describe("loadEnv()", () => {
         secretAccessKey: "secret",
         forcePathStyle: true,
       },
+      trustProxy: 0,
+      maintenanceToken: undefined,
     });
   });
 
@@ -83,5 +85,27 @@ describe("loadEnv()", () => {
 
   it.each(["1", "yes", "ture", "TRUE"])("refuse S3_FORCE_PATH_STYLE=%s", (value) => {
     expect(() => loadEnv({ ...VALID, S3_FORCE_PATH_STYLE: value })).toThrow('doit valoir "true" ou "false"');
+  });
+
+  it("lit TRUST_PROXY comme un nombre de proxys, 0 s'il est absent", () => {
+    expect(loadEnv(VALID).trustProxy).toBe(0);
+    expect(loadEnv({ ...VALID, TRUST_PROXY: "1" }).trustProxy).toBe(1);
+  });
+
+  // « true » ferait croire n'importe quel X-Forwarded-For : contournement trivial du rate limit.
+  it.each(["true", "-1", "1.5", "un"])("refuse TRUST_PROXY=%s", (value) => {
+    expect(() => loadEnv({ ...VALID, TRUST_PROXY: value })).toThrow(
+      "TRUST_PROXY doit être un nombre de proxys",
+    );
+  });
+
+  it("rend MAINTENANCE_TOKEN facultatif (absent ou vide → route non montée)", () => {
+    expect(loadEnv(VALID).maintenanceToken).toBeUndefined();
+    expect(loadEnv({ ...VALID, MAINTENANCE_TOKEN: "" }).maintenanceToken).toBeUndefined();
+  });
+
+  it("exige un MAINTENANCE_TOKEN d'au moins 32 caractères", () => {
+    expect(() => loadEnv({ ...VALID, MAINTENANCE_TOKEN: "trop-court" })).toThrow("au moins 32 caractères");
+    expect(loadEnv({ ...VALID, MAINTENANCE_TOKEN: "x".repeat(32) }).maintenanceToken).toBe("x".repeat(32));
   });
 });

@@ -38,7 +38,8 @@ export interface Storage {
     options?: { contentType?: string; signal?: AbortSignal },
   ): Promise<void>;
   getStream(key: string): Promise<Readable>;
-  exists(key: string): Promise<boolean>;
+  // Taille réelle de l'objet en octets, ou undefined s'il n'existe pas.
+  getSize(key: string): Promise<number | undefined>;
   deleteObjects(keys: string[]): Promise<DeleteResult>;
 }
 
@@ -49,8 +50,12 @@ function isNotFound(error: unknown): boolean {
   return error instanceof S3ServiceException && error.$metadata.httpStatusCode === 404;
 }
 
+// Un refus de connexion arrive en AggregateError au message vide : on se rabat alors sur son code (ECONNREFUSED)
+// pour que les logs disent quelque chose.
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  if (!(error instanceof Error)) return String(error);
+  const code = (error as { code?: unknown }).code;
+  return error.message || (typeof code === "string" ? code : error.name);
 }
 
 // Les erreurs brutes sont illisibles au démarrage : une réponse HEAD n'a pas de corps (le SDK la nomme
@@ -137,12 +142,13 @@ export function createStorage(config: StorageConfig): Storage {
       return response.Body;
     },
 
-    async exists(key) {
+    // HEAD : métadonnées seules, sans télécharger le contenu.
+    async getSize(key) {
       try {
-        await client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
-        return true;
+        const response = await client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
+        return response.ContentLength ?? 0;
       } catch (error) {
-        if (isNotFound(error)) return false;
+        if (isNotFound(error)) return undefined;
         throw error;
       }
     },

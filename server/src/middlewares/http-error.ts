@@ -16,6 +16,8 @@ export class HttpError extends Error {
 // restent cohérents dans toute l'API.
 export const badRequest = (message = "Requête invalide.") => new HttpError(400, message);
 
+export const forbidden = (message = "Accès refusé.") => new HttpError(403, message);
+
 export const notFound = (message = "Ressource introuvable.") => new HttpError(404, message);
 
 // 410 plutôt que 404 : la ressource a existé mais n'est plus disponible (transfert expiré ou déjà téléchargé).
