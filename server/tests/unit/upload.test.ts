@@ -1,10 +1,16 @@
 // Teste la réception multipart (Multer + moteur S3) avec un stockage en mémoire et des limites de quelques octets.
 import { Readable } from "node:stream";
 import express, { type Request } from "express";
+import { MulterError } from "multer";
 import request from "supertest";
-import { createS3StorageEngine } from "../../src/libs/s3-storage-engine.js";
+import {
+  createS3StorageEngine,
+  StorageWriteError,
+  TotalSizeLimitError,
+} from "../../src/libs/s3-storage-engine.js";
 import { errorHandler } from "../../src/middlewares/error-handler.js";
-import { createUploadMiddleware, type UploadLimits } from "../../src/middlewares/upload.js";
+import { HttpError } from "../../src/middlewares/http-error.js";
+import { createUploadMiddleware, toHttpError, type UploadLimits } from "../../src/middlewares/upload.js";
 import { createMemoryStorage, type MemoryStorage } from "../helpers/memory-storage.js";
 
 const LIMITS: UploadLimits = { maxFileSizeBytes: 10, maxFiles: 3, maxTotalBytes: 15 };
@@ -167,5 +173,90 @@ describe("createS3StorageEngine._removeFile", () => {
 
     expect(storage.objects.size).toBe(0);
     expect(storage.deletedKeys).toEqual([file.path]);
+  });
+});
+
+describe("toHttpError", () => {
+  // Limites réelles : les messages affichés à l'utilisateur doivent citer les vraies valeurs.
+  const REAL: UploadLimits = {
+    maxFileSizeBytes: 200 * 1024 * 1024,
+    maxFiles: 20,
+    maxTotalBytes: 500 * 1024 * 1024,
+  };
+  const multerError = (code: ConstructorParameters<typeof MulterError>[0], filename?: string) =>
+    Object.assign(new MulterError(code, "files"), filename ? { filename } : {});
+
+  it.each([
+    [
+      "LIMIT_FILE_SIZE",
+      multerError("LIMIT_FILE_SIZE", "film.mp4"),
+      413,
+      "Le fichier « film.mp4 » dépasse la taille maximale de 200 Mo.",
+    ],
+    [
+      "LIMIT_FILE_COUNT",
+      multerError("LIMIT_FILE_COUNT"),
+      400,
+      "Trop de fichiers : 20 au maximum par transfert.",
+    ],
+    [
+      "LIMIT_UNEXPECTED_FILE",
+      multerError("LIMIT_UNEXPECTED_FILE"),
+      400,
+      "Les fichiers doivent être envoyés dans le champ « files ».",
+    ],
+    [
+      "LIMIT_FIELD_COUNT",
+      multerError("LIMIT_FIELD_COUNT"),
+      400,
+      "Seuls des fichiers sont acceptés dans cet envoi.",
+    ],
+    [
+      "un autre code Multer",
+      multerError("LIMIT_PART_COUNT"),
+      400,
+      "Le formulaire d'envoi est invalide ou incomplet.",
+    ],
+    [
+      "le plafond du cumul",
+      new TotalSizeLimitError(500 * 1024 * 1024),
+      413,
+      "L'envoi dépasse la taille totale maximale de 500 Mo.",
+    ],
+    [
+      "une erreur de busboy",
+      new Error("Unexpected end of form"),
+      400,
+      "Le formulaire d'envoi est invalide ou incomplet.",
+    ],
+  ])("traduit %s en HttpError %i", (_label, error, status, message) => {
+    const translated = toHttpError(error, REAL);
+
+    expect(translated).toBeInstanceOf(HttpError);
+    expect(translated).toMatchObject({ status, message });
+  });
+
+  it("laisse passer une panne de stockage telle quelle (réponse 500)", () => {
+    const failure = new StorageWriteError(new Error("S3 injoignable"));
+
+    expect(toHttpError(failure, REAL)).toBe(failure);
+  });
+});
+
+describe("createS3StorageEngine._removeFile (échec)", () => {
+  it("signale à Multer une suppression que le stockage a refusée", async () => {
+    const storage = createMemoryStorage();
+    storage.deleteObjects = async (keys) => ({
+      deleted: 0,
+      failed: keys.map((key) => ({ key, reason: "AccessDenied" })),
+    });
+    const engine = createS3StorageEngine(storage, { maxTotalBytes: 100 });
+    const file = { path: "uploads/inconnu.txt" } as Express.Multer.File;
+
+    const error = await new Promise<Error | null>((resolve) =>
+      engine._removeFile({} as Request, file, resolve),
+    );
+
+    expect(error?.message).toBe("suppression impossible : AccessDenied");
   });
 });

@@ -1,11 +1,13 @@
 // Teste la construction du ZIP : noms sûrs et uniques, taille exacte annoncée, ouverture séquentielle, erreurs, arrêt.
 import { PassThrough, Readable } from "node:stream";
 import {
+  computeZipSize,
   createZipStream,
   dedupeEntryNames,
   sanitizeEntryName,
   type ZipEntrySource,
 } from "../../src/libs/zip.js";
+import { readStoredZip } from "../helpers/read-zip.js";
 
 // Laisse s'exécuter les promesses et callbacks en attente.
 const tick = () => new Promise((resolve) => setImmediate(resolve));
@@ -59,6 +61,20 @@ describe("dedupeEntryNames", () => {
   });
 });
 
+describe("computeZipSize", () => {
+  // Au-delà de 4 Gio, archiver passe en Zip64 et la formule ne vaut plus : mieux vaut ne rien annoncer
+  // (envoi sans Content-Length) qu'annoncer une taille fausse. Impossible avec les limites actuelles (500 Mo).
+  it("renonce à annoncer une taille au-delà de 4 Gio", () => {
+    expect(computeZipSize([{ name: "a.bin", sizeBytes: 0xffffffff }])).toBeUndefined();
+    expect(
+      computeZipSize([
+        { name: "a.bin", sizeBytes: 3 * 1024 ** 3 },
+        { name: "b.bin", sizeBytes: 2 * 1024 ** 3 },
+      ]),
+    ).toBeUndefined();
+  });
+});
+
 describe("createZipStream", () => {
   it("produit une archive ZIP contenant une entrée par fichier", async () => {
     const { stream } = createZipStream([entry("a.txt", "A"), entry("a.txt", "B")]);
@@ -70,6 +86,23 @@ describe("createZipStream", () => {
     expect(archive.includes(Buffer.from([0x50, 0x4b, 0x05, 0x06]))).toBe(true);
     expect(archive.includes("a.txt")).toBe(true);
     expect(archive.includes("a (2).txt")).toBe(true);
+  });
+
+  // Vérifie aussi le lecteur de ZIP des tests d'intégration : relue, l'archive redonne exactement les fichiers.
+  it("produit une archive dont chaque fichier se relit à l'identique", async () => {
+    const big = Buffer.from(Array.from({ length: 300_000 }, (_, i) => i % 251));
+    const { stream } = createZipStream([
+      entry("Été.txt", "accent"),
+      entry("gros.bin", big),
+      entry("Été.txt", ""),
+    ]);
+
+    const files = readStoredZip(await collect(stream));
+
+    expect([...files.keys()]).toEqual(["Été.txt", "gros.bin", "Été (2).txt"]);
+    expect(files.get("Été.txt")?.toString()).toBe("accent");
+    expect(files.get("gros.bin")?.equals(big)).toBe(true);
+    expect(files.get("Été (2).txt")?.length).toBe(0);
   });
 
   // Le Content-Length repose sur ce calcul : il doit être exact à l'octet près, sinon le téléchargement casse.
@@ -176,5 +209,24 @@ describe("createZipStream", () => {
 
     expect(first.destroyed).toBe(true);
     expect(secondOpened).toBe(false);
+  });
+
+  // Course réelle : le client part pendant que la requête GetObject est en vol. Le flux qui arrive ensuite
+  // doit être fermé aussitôt, sinon la connexion S3 resterait ouverte pour rien.
+  it("ferme un flux S3 arrivé après la destruction de l'archive", async () => {
+    let deliver: (stream: Readable) => void = () => {};
+    const late = new PassThrough();
+    const { stream } = createZipStream([
+      { name: "a.txt", sizeBytes: 1, open: () => new Promise<Readable>((resolve) => (deliver = resolve)) },
+    ]);
+
+    // L'archive est détruite ET son événement « close » déjà traité avant que le flux n'arrive : c'est bien
+    // le flux retardataire qu'on teste, pas celui que le gestionnaire de « close » fermerait.
+    stream.destroy();
+    await tick();
+    deliver(late);
+    await tick();
+
+    expect(late.destroyed).toBe(true);
   });
 });

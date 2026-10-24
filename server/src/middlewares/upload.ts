@@ -29,7 +29,7 @@ const DEFAULT_LIMITS: UploadLimits = {
 // Une erreur 400/413 pour tout ce qui vient du client ; seule une panne du stockage reste une erreur 500.
 // Le reste (formulaire tronqué, frontière multipart absente, client parti en cours d'envoi) provient de busboy
 // sous forme d'Error ordinaire : c'est une requête invalide, pas un bug du serveur.
-function toHttpError(error: unknown, limits: UploadLimits): HttpError | StorageWriteError {
+export function toHttpError(error: unknown, limits: UploadLimits): HttpError | StorageWriteError {
   if (error instanceof StorageWriteError) return error;
   if (error instanceof TotalSizeLimitError) {
     return payloadTooLarge(

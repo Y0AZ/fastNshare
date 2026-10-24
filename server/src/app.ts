@@ -1,6 +1,7 @@
 // Construit l'application Express sans ouvrir de port : importable telle quelle par les tests (Supertest).
 import express, { type Express } from "express";
 import type { Storage } from "./libs/storage.js";
+import type { UploadLimits } from "./middlewares/upload.js";
 import { errorHandler, notFoundHandler } from "./middlewares/error-handler.js";
 import { createMaintenanceRouter } from "./routes/maintenance.routes.js";
 import { createTransfersRouter } from "./routes/transfers.routes.js";
@@ -13,11 +14,19 @@ export type AppDependencies = {
   trustProxy?: number;
   // Jeton de maintenance (MAINTENANCE_TOKEN) ; absent → routes de maintenance non montées.
   maintenanceToken?: string;
+  // Limites d'upload (section 5.4 par défaut) : les tests d'intégration les abaissent pour vérifier un 413
+  // avec quelques Mo au lieu de 200.
+  uploadLimits?: UploadLimits;
 };
 
 // Une fabrique plutôt qu'une instance partagée : chaque test obtient une app neuve, et la configuration
 // (CORS, limites…) pourra lui être passée en paramètre sans dépendre de process.env.
-export function createApp({ storage, trustProxy = 0, maintenanceToken }: AppDependencies): Express {
+export function createApp({
+  storage,
+  trustProxy = 0,
+  maintenanceToken,
+  uploadLimits,
+}: AppDependencies): Express {
   const app = express();
 
   // trust proxy : derrière Render, la connexion vient du proxy de Render, pas du client. Sans ce réglage,
@@ -36,7 +45,7 @@ export function createApp({ storage, trustProxy = 0, maintenanceToken }: AppDepe
     res.json({ status: "ok" });
   });
 
-  app.use("/api/transfers", createTransfersRouter(storage));
+  app.use("/api/transfers", createTransfersRouter(storage, uploadLimits));
 
   // Montée seulement si un jeton est configuré : sans jeton, la route n'existe pas (404) au lieu d'exister
   // sans protection, ou protégée par un jeton vide qu'il suffirait d'envoyer.

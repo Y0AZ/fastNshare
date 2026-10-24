@@ -1,7 +1,7 @@
 // Contrôleur des transferts : traduit les requêtes HTTP en opérations sur le modèle Transfer et le stockage.
 import { pipeline } from "node:stream/promises";
 import type { RequestHandler } from "express";
-import { MAX_DOWNLOADS, TRANSFER_TTL_MS } from "../configs/limits.js";
+import { computeExpiresAt, MAX_DOWNLOADS } from "../configs/limits.js";
 import { generateUniqueCode, isValidCode, normalizeCode } from "../libs/code.js";
 import type { Storage } from "../libs/storage.js";
 import { createZipStream } from "../libs/zip.js";
@@ -39,7 +39,7 @@ export function createTransfersController(storage: Storage) {
       transfer = await generateUniqueCode((code) =>
         Transfer.create({
           code,
-          expiresAt: new Date(Date.now() + TRANSFER_TTL_MS),
+          expiresAt: computeExpiresAt(),
           maxDownloads: MAX_DOWNLOADS,
           files,
         }),

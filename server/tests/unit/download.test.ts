@@ -139,6 +139,24 @@ describe("GET /api/transfers/:code/download", () => {
     expect(String(logged[0]?.[0])).toContain("incomplet");
   });
 
+  // Double panne : S3 injoignable, puis Mongo qui refuse la libération. Le client reçoit l'erreur d'origine,
+  // et la réservation perdue est signalée dans les logs (le destinataire ne pourra pas réessayer).
+  it("journalise une libération impossible sans masquer l'erreur d'origine", async () => {
+    storage.getSize = async () => {
+      throw new Error("S3 injoignable");
+    };
+    stub("updateOne", async () => {
+      throw new Error("Mongo injoignable");
+    });
+
+    const response = await request(createApp({ storage })).get(URL);
+
+    expect(response.status).toBe(500);
+    expect(logged.some(([message]) => String(message).includes("Impossible de libérer la réservation"))).toBe(
+      true,
+    );
+  });
+
   it("libère la réservation si le stockage est injoignable avant l'envoi (500)", async () => {
     storage.getSize = async () => {
       throw new Error("S3 injoignable");

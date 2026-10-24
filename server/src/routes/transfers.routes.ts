@@ -4,14 +4,14 @@ import { createTransfersController } from "../controllers/transfers.controller.j
 import type { Storage } from "../libs/storage.js";
 import { HttpError } from "../middlewares/http-error.js";
 import { createDownloadRateLimit } from "../middlewares/rate-limit.js";
-import { createUploadMiddleware } from "../middlewares/upload.js";
+import { createUploadMiddleware, type UploadLimits } from "../middlewares/upload.js";
 
-export function createTransfersRouter(storage: Storage): Router {
+export function createTransfersRouter(storage: Storage, uploadLimits?: UploadLimits): Router {
   const router = Router();
   const controller = createTransfersController(storage);
 
   // L'upload (fichiers → S3) précède le contrôleur : celui-ci ne voit que des fichiers déjà stockés et validés.
-  router.post("/", createUploadMiddleware(storage), controller.create);
+  router.post("/", createUploadMiddleware(storage, uploadLimits), controller.create);
 
   // Express sert automatiquement HEAD avec le handler GET : une simple requête HEAD (sonde, aperçu de lien)
   // consommerait alors l'unique téléchargement. Déclarée AVANT le GET, cette route l'intercepte.

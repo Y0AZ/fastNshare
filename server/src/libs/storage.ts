@@ -60,7 +60,7 @@ function errorMessage(error: unknown): string {
 
 // Les erreurs brutes sont illisibles au démarrage : une réponse HEAD n'a pas de corps (le SDK la nomme
 // « UnknownError »), et un refus de connexion arrive en AggregateError IPv4 + IPv6 au message vide.
-function describeS3Error(error: unknown, bucket: string): string {
+export function describeS3Error(error: unknown, bucket: string): string {
   if (error instanceof S3ServiceException) {
     const status = error.$metadata.httpStatusCode;
     if (status === 403) {

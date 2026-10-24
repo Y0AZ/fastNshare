@@ -21,6 +21,12 @@ export const MAX_TRANSFER_SIZE_BYTES = 500 * MEGABYTE;
 export const REQUEST_TIMEOUT_MS = 30 * 60 * 1000;
 
 export const TRANSFER_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+// Date d'expiration d'un transfert créé à l'instant `from`. Un instant absolu + 7 × 24 h : le résultat ne dépend
+// ni du fuseau horaire du serveur ni des changements d'heure (une « journée » civile peut faire 23 ou 25 h).
+export function computeExpiresAt(from: Date = new Date()): Date {
+  return new Date(from.getTime() + TRANSFER_TTL_MS);
+}
 export const MAX_DOWNLOADS = 1;
 
 // Pour les messages d'erreur : les limites sont en octets dans le code, en Mo pour l'utilisateur.

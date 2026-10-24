@@ -1,5 +1,6 @@
 // Configuration Jest des tests UNITAIRES, en ESM natif (le projet est "type": "module").
 // Lancé avec NODE_OPTIONS=--experimental-vm-modules : c'est le mécanisme qui permet à Jest d'exécuter de l'ESM.
+// Les tests d'intégration réutilisent cette base (jest.integration.config.js) : une seule config à maintenir.
 
 /** @type {import("jest").Config} */
 export default {
@@ -26,4 +27,15 @@ export default {
       },
     ],
   },
+
+  // Couverture (npm run test:coverage). Moteur V8 : c'est Node qui compte les lignes exécutées. Le moteur par
+  // défaut (Babel) instrumente le code au moment de la transformation, or ici c'est SWC qui transforme : il ne
+  // verrait rien.
+  coverageProvider: "v8",
+  // Tout le code source, y compris les fichiers qu'aucun test n'importe (sinon ils seraient oubliés, pas à 0 %).
+  // server.ts est exclu : c'est le point d'entrée (connexions réelles, listen, signaux), qu'on vérifie en
+  // démarrant le serveur, pas en test unitaire.
+  collectCoverageFrom: ["src/**/*.ts", "!src/server.ts"],
+  // « text » : tableau dans le terminal ; « html » : rapport navigable dans coverage/index.html (ignoré par git).
+  coverageReporters: ["text", "html"],
 };
