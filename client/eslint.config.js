@@ -7,7 +7,9 @@ import tseslint from "typescript-eslint";
 import { defineConfig, globalIgnores } from "eslint/config";
 
 export default defineConfig([
-  globalIgnores(["dist", "coverage"]),
+  // react-bits/ : composants tiers copiés tels quels (comme pour Prettier). LatticeLoader enfreint des règles
+  // récentes de react-hooks (lecture de refs pendant le rendu) ; les corriger éloignerait le code de sa source.
+  globalIgnores(["dist", "coverage", "src/components/react-bits"]),
   {
     files: ["**/*.{ts,tsx}"],
     extends: [
