@@ -42,6 +42,7 @@ describe("loadEnv()", () => {
       },
       trustProxy: 0,
       maintenanceToken: undefined,
+      corsOrigins: [],
     });
   });
 
@@ -108,4 +109,28 @@ describe("loadEnv()", () => {
     expect(() => loadEnv({ ...VALID, MAINTENANCE_TOKEN: "trop-court" })).toThrow("au moins 32 caractères");
     expect(loadEnv({ ...VALID, MAINTENANCE_TOKEN: "x".repeat(32) }).maintenanceToken).toBe("x".repeat(32));
   });
+
+  it("lit CORS_ORIGIN comme une liste d'origines, vide si absente", () => {
+    expect(loadEnv(VALID).corsOrigins).toEqual([]);
+    expect(
+      loadEnv({ ...VALID, CORS_ORIGIN: "https://fastshare.vercel.app, http://localhost:5173" }).corsOrigins,
+    ).toEqual(["https://fastshare.vercel.app", "http://localhost:5173"]);
+  });
+
+  // Le navigateur envoie l'origine sans « / » final : une URL recopiée avec ce « / » ne correspondrait jamais.
+  it("ramène chaque entrée à son origine (« / » final retiré, port conservé)", () => {
+    expect(loadEnv({ ...VALID, CORS_ORIGIN: "https://fastshare.vercel.app/" }).corsOrigins).toEqual([
+      "https://fastshare.vercel.app",
+    ]);
+    expect(loadEnv({ ...VALID, CORS_ORIGIN: "http://localhost:5173/,," }).corsOrigins).toEqual([
+      "http://localhost:5173",
+    ]);
+  });
+
+  it.each(["fastshare.vercel.app", "https://fastshare.vercel.app/app", "ftp://exemple.fr", "*"])(
+    "refuse CORS_ORIGIN=%s",
+    (value) => {
+      expect(() => loadEnv({ ...VALID, CORS_ORIGIN: value })).toThrow("n'est pas une origine valide");
+    },
+  );
 });

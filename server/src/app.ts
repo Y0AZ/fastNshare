@@ -1,4 +1,5 @@
 // Construit l'application Express sans ouvrir de port : importable telle quelle par les tests (Supertest).
+import cors from "cors";
 import express, { type Express } from "express";
 import type { Storage } from "./libs/storage.js";
 import type { UploadLimits } from "./middlewares/upload.js";
@@ -17,6 +18,8 @@ export type AppDependencies = {
   // Limites d'upload (section 5.4 par défaut) : les tests d'intégration les abaissent pour vérifier un 413
   // avec quelques Mo au lieu de 200.
   uploadLimits?: UploadLimits;
+  // Origines autorisées à appeler l'API depuis un navigateur (CORS_ORIGIN) ; vide → CORS désactivé.
+  corsOrigins?: string[];
 };
 
 // Une fabrique plutôt qu'une instance partagée : chaque test obtient une app neuve, et la configuration
@@ -26,6 +29,7 @@ export function createApp({
   trustProxy = 0,
   maintenanceToken,
   uploadLimits,
+  corsOrigins = [],
 }: AppDependencies): Express {
   const app = express();
 
@@ -38,6 +42,22 @@ export function createApp({
 
   // Masque l'en-tête « X-Powered-By: Express » : inutile de dire au monde quel framework on utilise.
   app.disable("x-powered-by");
+
+  // CORS : le client (Vercel, ou localhost:5173 en développement) et l'API (Render, ou localhost:4000) sont sur
+  // deux origines différentes. Le navigateur refuse alors de livrer les réponses au JavaScript du client, sauf si
+  // l'API l'y autorise (Access-Control-Allow-Origin). Liste fermée plutôt que « * » : seul notre client est servi.
+  // CORS ne protège pas l'API elle-même (curl l'ignore) : c'est une règle que le navigateur applique à ses pages.
+  // Monté avant toutes les routes, /health compris : le client l'appelle aussi pour réveiller le serveur.
+  if (corsOrigins.length > 0) {
+    app.use(
+      cors({
+        origin: corsOrigins,
+        // Depuis une autre origine, le JavaScript ne lit que quelques en-têtes « sûrs » (Content-Type,
+        // Content-Length…). Content-Disposition porte le nom du ZIP, Retry-After le délai après un 429.
+        exposedHeaders: ["Content-Disposition", "Retry-After"],
+      }),
+    );
+  }
 
   // Sonde de disponibilité : utilisée par Render (health check), par le client pour réveiller le serveur (T4.7)
   // et par la CI. Elle ne touche ni Mongo ni S3 : elle dit seulement que le processus répond.

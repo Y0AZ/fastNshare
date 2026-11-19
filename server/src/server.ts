@@ -43,7 +43,12 @@ try {
 console.log(`Stockage S3 prêt (bucket ${env.s3.bucket})`);
 
 const port = env.port;
-const app = createApp({ storage, trustProxy: env.trustProxy, maintenanceToken: env.maintenanceToken });
+const app = createApp({
+  storage,
+  trustProxy: env.trustProxy,
+  maintenanceToken: env.maintenanceToken,
+  corsOrigins: env.corsOrigins,
+});
 
 // Express 5 transmet au callback les erreurs d'écoute (ex. port déjà utilisé) au lieu de les ignorer.
 const server = app.listen(port, (error) => {
@@ -55,6 +60,12 @@ const server = app.listen(port, (error) => {
   // Dit explicitement si la route de nettoyage existe : sinon un 404 en production serait déroutant.
   console.log(
     `Route de maintenance ${env.maintenanceToken ? "activée" : "désactivée (MAINTENANCE_TOKEN absent)"}`,
+  );
+  // Sans origine autorisée, le client web ne peut pas appeler l'API : mieux vaut le lire au démarrage.
+  console.log(
+    env.corsOrigins.length > 0
+      ? `CORS autorisé pour : ${env.corsOrigins.join(", ")}`
+      : "CORS désactivé (CORS_ORIGIN absent) : le client web ne pourra pas appeler l'API",
   );
 });
 // Compte depuis le début de la requête jusqu'à la fin de son corps : c'est lui qui borne la durée d'un upload.

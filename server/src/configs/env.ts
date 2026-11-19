@@ -13,6 +13,8 @@ export type Env = {
   trustProxy: number;
   // Absent → la route de maintenance n'est pas montée du tout.
   maintenanceToken?: string;
+  // Origines (navigateurs) autorisées à appeler l'API ; vide → CORS désactivé.
+  corsOrigins: string[];
 };
 
 type EnvSource = Record<string, string | undefined>;
@@ -90,6 +92,30 @@ function parseMaintenanceToken(raw: string | undefined): string | undefined {
   return raw;
 }
 
+// Liste séparée par des virgules (ex. l'URL Vercel, plus localhost:5173 en développement). Chaque entrée est
+// ramenée à son ORIGINE (protocole + hôte + port) : le navigateur envoie « https://x.vercel.app » sans « / »
+// final, et une URL recopiée avec un « / » ou un chemin ne correspondrait jamais, bloquant le client en silence.
+function parseCorsOrigins(raw: string | undefined): string[] {
+  if (raw === undefined) return [];
+  return raw
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry !== "")
+    .map((entry) => {
+      const url = URL.canParse(entry) ? new URL(entry) : undefined;
+      if (
+        !url ||
+        (url.protocol !== "http:" && url.protocol !== "https:") ||
+        (url.pathname !== "/" && url.pathname !== "")
+      ) {
+        throw new Error(
+          `CORS_ORIGIN : "${entry}" n'est pas une origine valide (ex. https://fastshare.vercel.app)`,
+        );
+      }
+      return url.origin;
+    });
+}
+
 // La source est injectable pour que les tests vérifient la validation sans modifier le vrai process.env.
 export function loadEnv(source: EnvSource = process.env): Env {
   return {
@@ -106,5 +132,6 @@ export function loadEnv(source: EnvSource = process.env): Env {
     },
     trustProxy: parseTrustProxy(optional(source, "TRUST_PROXY")),
     maintenanceToken: parseMaintenanceToken(optional(source, "MAINTENANCE_TOKEN")),
+    corsOrigins: parseCorsOrigins(optional(source, "CORS_ORIGIN")),
   };
 }

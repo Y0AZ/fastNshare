@@ -98,6 +98,20 @@ describe("GET /api/transfers/:code/download (vrai Mongo, vrai S3)", () => {
     expect(files.get("rapport (2).txt")?.toString()).toBe("second");
   });
 
+  // Ce que verra le client web : depuis son origine, le nom du ZIP (Content-Disposition) doit lui être lisible.
+  it("expose le nom du ZIP au client web autorisé (CORS)", async () => {
+    const origin = "http://localhost:5173";
+    const app = ctx.app({ corsOrigins: [origin] });
+    const code = await createTransfer(app, [["a.txt", Buffer.from("x")]]);
+
+    const response = await download(app, code).set("Origin", origin);
+
+    expect(response.status).toBe(200);
+    expect(response.headers["access-control-allow-origin"]).toBe(origin);
+    expect(response.headers["access-control-expose-headers"]).toContain("Content-Disposition");
+    expect(response.headers["content-disposition"]).toBe(`attachment; filename="fastshare-${code}.zip"`);
+  });
+
   it("répond 410 au deuxième téléchargement", async () => {
     const app = ctx.app();
     const code = await createTransfer(app, [["a.txt", Buffer.from("x")]]);
